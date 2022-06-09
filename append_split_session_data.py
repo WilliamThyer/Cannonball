@@ -1,14 +1,14 @@
-import decode_eeg
+import eeg_decoder 
 import pandas as pd
 import numpy as np
 import scipy.io as io
 
 experiment_name = 'C01'
 data_dir = f'./data/{experiment_name}'
-exp = decode_eeg.Experiment(experiment_name, data_dir, test=False)
+exp = eeg_decoder.Experiment(experiment_name, data_dir, dev=False)
 
-# match_list = [('05','06'),('07','08'),('09', '10'),('11', '12')]
-match_list = [('13', '14')]
+match_list = [('02','03'),('05','06'),('07','08'),('09', '10'),('11', '12'),('13', '14')]
+match_list = [('02', '03')]
 
 # find file indices for matched subjects
 match_list_idx = []
