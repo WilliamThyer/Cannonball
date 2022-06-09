@@ -38,7 +38,7 @@ import eyelinker
 
 # Things you probably want to change
 number_of_trials_per_block = 48 # must be divisible by 12
-number_of_blocks = 14
+number_of_blocks = 24
 percent_same = 0.5  # between 0 and 1
 block_conditions = ['N1','H1','L1','2']
 block_conditions_dict = {
