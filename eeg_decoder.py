@@ -18,7 +18,11 @@ from statsmodels.stats.multitest import multipletests
 
 
 class Experiment:
-    def __init__(self, experiment_name, data_dir, info_from_file=True, dev=False, info_variable_names=['unique_id', 'chan_labels', 'chan_x', 'chan_y', 'chan_z', 'sampling_rate', 'times']):
+    def __init__(
+        self, experiment_name, data_dir, info_from_file=True, dev=False, 
+        info_variable_names=['unique_id', 'chan_labels', 'chan_x', 'chan_y', 'chan_z', 'sampling_rate', 'times'],
+        trim_timepoints = None
+        ):
         """Organizes and loads in EEG, trial labels, behavior, eyetracking, and session data.
 
         Keyword arguments:
@@ -27,9 +31,11 @@ class Experiment:
         info_from_file -- pull info from 0th info file in data_dir (default True)
         dev -- development mode: only use first 3 subjects' data (default False)
         info_variable_names -- names of variables to pull from info file
+        trim_timepoints -- trims info.times and all loaded EEG data
         """
         self.experiment_name = experiment_name
         self.data_dir = Path(data_dir)
+        self.trim_idx = None 
 
         self.xdata_files = sorted(list(self.data_dir.glob('*xdata*.mat')))
         self.ydata_files = sorted(list(self.data_dir.glob('*ydata*.mat')))
@@ -46,6 +52,11 @@ class Experiment:
             self.info = self.load_info(0, info_variable_names)
             self.info.pop('unique_id')
 
+            if trim_timepoints:
+                self.trim_idx = (self.info['times']>=trim_timepoints[0])&(self.info['times']<=trim_timepoints[1])
+                self.info['original_times'] = self.info['times']
+                self.info['times'] = self.info['times'][self.trim_idx]
+
     def load_eeg(self, isub):
         """
         loads xdata (eeg data) and ydata (trial labels) from .mat
@@ -56,6 +67,9 @@ class Experiment:
         subj_mat = sio.loadmat(
             self.xdata_files[isub], variable_names=['xdata'])
         xdata = np.moveaxis(subj_mat['xdata'], [0, 1, 2], [1, 2, 0])
+        
+        if self.trim_idx is not None:
+            xdata = xdata[:,:,self.trim_idx]
 
         ydata = self.load_ydata(isub)
 
@@ -666,7 +680,7 @@ class Wrangler:
         for self.ielec, electrode_subset in enumerate(self.electrode_subset_list):
             yield self.select_electrodes(xdata_all, electrode_subset), ydata_all
 
-    def bin_and_split_data(self, xdata, ydata, permute_trials = True):
+    def bin_and_split_data(self, xdata, ydata):
         """
         returns xtrain and xtest data and labels, binned
 
@@ -677,8 +691,7 @@ class Wrangler:
         """
         
         for self.ifold in range(self.n_splits):
-            
-            xdata_binned, ydata_binned = self.bin_trials(xdata, ydata, permute_trials=permute_trials)
+            xdata_binned, ydata_binned = self.bin_trials(xdata, ydata)
             X_train_all, X_test_all, y_train, y_test = train_test_split(xdata_binned,ydata_binned,stratify=ydata_binned)
 
             yield X_train_all, X_test_all, y_train, y_test
@@ -1351,7 +1364,7 @@ class Interpreter:
         self.savefig('conf_mat'+subtitle, save=savefig)
         plt.show()
     
-    def plot_hyperplane(self, subtitle='', stim_time=[0, 250], figsize=[9,6],
+    def plot_hyperplane(self, subtitle='', stim_time=[0, 250],
                         savefig=False, title=None, ylim=[-4,4], legend_title='Trial condition', legend_pos = 'lower right',
                         label_text_x = -105, label_text_ys = [-3.4,2.8], stim_label_xy = [120,3.5], arrow_ys = [-1.1,1.2]):
 
@@ -1359,7 +1372,7 @@ class Interpreter:
         Plots the confidence scores of each label.
         '''
 
-        fig,ax = plt.subplots(1,figsize=figsize)
+        ax = plt.subplot(111)
         stim_lower = ylim[0]+.01
         stim_upper = ylim[1]
         ax.fill_between(stim_time, [stim_lower, stim_lower], [
@@ -1393,9 +1406,9 @@ class Interpreter:
         plt.title(title,fontsize=18)
         plt.xlabel('Time from stimulus onset (ms)', fontsize=14)
         plt.ylabel('Distance from hyperplane (a.u.)', fontsize=14)
-        plt.text(label_text_x,label_text_ys[0],f'Predicted\n{self.labels[0]}',fontsize=14,ha='center')
-        plt.text(label_text_x,label_text_ys[1],f'Predicted\n{self.labels[-1]}',fontsize=14,ha='center')
-        plt.text(stim_label_xy[0],stim_label_xy[1],'Stim',fontsize=18,ha='center',c='white')
+        plt.text(label_text_x,label_text_ys[0],f'Predicted\n{self.labels[0]}',fontsize=12,ha='center')
+        plt.text(label_text_x,label_text_ys[1],f'Predicted\n{self.labels[-1]}',fontsize=12,ha='center')
+        plt.text(stim_label_xy[0],stim_label_xy[1],'Stim',fontsize=14,ha='center',c='white')
         plt.arrow(label_text_x,arrow_ys[0],0,-1,head_width=45, head_length=.25,color='k')
         plt.arrow(label_text_x,arrow_ys[1],0,1, head_width=45, head_length=.25,color='k')
 
